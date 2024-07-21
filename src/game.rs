@@ -23,14 +23,6 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     ));
 }
 
-const DIRECTIONS: [IVec2; 4] = [IVec2::Y, IVec2::NEG_Y, IVec2::NEG_X, IVec2::X];
-const ARROW_KEYS: [KeyCode; 4] = [
-    KeyCode::ArrowUp,
-    KeyCode::ArrowDown,
-    KeyCode::ArrowLeft,
-    KeyCode::ArrowRight,
-];
-const WASD_KEYS: [KeyCode; 4] = [KeyCode::KeyW, KeyCode::KeyS, KeyCode::KeyA, KeyCode::KeyD];
 const GRID_SIZE: UVec2 = UVec2::new(16, 9);
 const CELL_SIZE: f32 = 80.;
 
@@ -53,17 +45,35 @@ fn update_positions(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut positions: Query<&mut Position, With<Player>>,
 ) {
+    let Some(direction) = keyboard_direction(&keyboard) else {
+        return;
+    };
+
     for mut pos in positions.iter_mut() {
-        let Some((_, direction)) = ARROW_KEYS
+        pos.0 = (pos.0 + direction).clamp(IVec2::ZERO, GRID_SIZE.as_ivec2() - 1);
+    }
+}
+
+fn keyboard_direction(keyboard: &Res<ButtonInput<KeyCode>>) -> Option<IVec2> {
+    const DIRECTIONS: [IVec2; 4] = [IVec2::Y, IVec2::NEG_Y, IVec2::NEG_X, IVec2::X];
+    const ARROW_KEYS: [KeyCode; 4] = [
+        KeyCode::ArrowUp,
+        KeyCode::ArrowDown,
+        KeyCode::ArrowLeft,
+        KeyCode::ArrowRight,
+    ];
+    const WASD_KEYS: [KeyCode; 4] = [KeyCode::KeyW, KeyCode::KeyS, KeyCode::KeyA, KeyCode::KeyD];
+
+    for keys in [ARROW_KEYS, WASD_KEYS] {
+        if let Some((_, direction)) = keys
             .iter()
             .zip(DIRECTIONS.iter())
             .find(|(key, _)| keyboard.just_pressed(**key))
-        else {
-            continue;
+        {
+            return Some(*direction);
         };
-
-        pos.0 = (pos.0 + *direction).clamp(IVec2::ZERO, GRID_SIZE.as_ivec2() - 1);
     }
+    None
 }
 
 fn draw_grid(mut gizmos: Gizmos) {
