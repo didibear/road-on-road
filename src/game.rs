@@ -1,4 +1,6 @@
 use bevy::{color::palettes::css::*, prelude::*, sprite::Anchor};
+use rand::seq::SliceRandom;
+use rand::Rng;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(Startup, (setup_camera, spawn_player))
@@ -20,8 +22,8 @@ pub fn setup_camera(mut commands: Commands) {
 }
 
 fn spawn_player(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let start_pos = Position(IVec2::new(5, 5));
-    let target_pos = Position(IVec2::new(8, 8));
+    let start_pos = rand_position();
+    let target_pos = rand_position();
 
     commands.spawn((
         Player,
@@ -44,8 +46,39 @@ fn spawn_player(mut commands: Commands, asset_server: Res<AssetServer>) {
             index: 0,
             start_pos,
             target_pos,
+            color: rand_color(),
         },
     ));
+}
+
+fn rand_position() -> Position {
+    Position(IVec2::new(
+        rand::thread_rng().gen_range(0..GRID_SIZE.x) as i32,
+        rand::thread_rng().gen_range(0..GRID_SIZE.y) as i32,
+    ))
+}
+
+fn rand_color() -> Color {
+    const COLORS: [Srgba; 15] = [
+        LIGHT_BLUE,
+        LIGHT_CORAL,
+        LIGHT_CYAN,
+        LIGHT_GOLDENROD_YELLOW,
+        LIGHT_GRAY,
+        LIGHT_GREEN,
+        LIGHT_GREY,
+        LIGHT_PINK,
+        LIGHT_SALMON,
+        LIGHT_SEA_GREEN,
+        LIGHT_SKY_BLUE,
+        LIGHT_SLATE_GRAY,
+        LIGHT_SLATE_GREY,
+        LIGHT_STEEL_BLUE,
+        LIGHT_YELLOW,
+    ];
+
+    let mut rng = rand::thread_rng();
+    Color::Srgba(*COLORS.choose(&mut rng).unwrap())
 }
 
 const GRID_SIZE: UVec2 = UVec2::new(16, 9);
@@ -66,6 +99,7 @@ struct Journey {
     target_pos: Position,
     path: Vec<Position>,
     index: usize,
+    color: Color,
 }
 
 #[derive(Event)]
@@ -166,7 +200,7 @@ fn draw_targets(mut gizmos: Gizmos, journeys: Query<&Journey>) {
         gizmos.circle_2d(
             position_translation(&journey.target_pos) + CELL_SIZE / 2.,
             CELL_SIZE / 2. * 0.95,
-            RED,
+            journey.color,
         );
     }
 }
@@ -177,7 +211,7 @@ fn draw_paths(mut gizmos: Gizmos, journeys: Query<&Journey>) {
                 position_translation(pos) + CELL_SIZE / 2.,
                 0.,
                 Vec2::splat(CELL_SIZE * 0.95),
-                RED,
+                journey.color,
             );
         }
     }
