@@ -43,7 +43,7 @@ fn spawn_player(mut commands: Commands, asset_server: Res<AssetServer>) {
         start_pos,
         Journey {
             path: Vec::from([start_pos]),
-            index: 0,
+            bot_index: 0,
             start_pos,
             target_pos,
             color: rand_color(),
@@ -84,7 +84,7 @@ fn rand_color() -> Color {
 const GRID_SIZE: UVec2 = UVec2::new(16, 9);
 const CELL_SIZE: f32 = 80.;
 
-#[derive(Debug, Component, Clone, Copy)]
+#[derive(Debug, Component, Clone, Copy, PartialEq, Eq)]
 struct Position(IVec2);
 
 #[derive(Debug, Component)]
@@ -98,7 +98,7 @@ struct Journey {
     start_pos: Position,
     target_pos: Position,
     path: Vec<Position>,
-    index: usize,
+    bot_index: usize,
     color: Color,
 }
 
@@ -109,6 +109,7 @@ fn update_positions(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut positions: Query<(Entity, &mut Position, &mut Journey), With<Player>>,
+    mut bot_positions: Query<(&mut Position, &mut Journey), (With<Automated>, Without<Player>)>,
 ) {
     let Some(direction) = keyboard_direction(&keyboard) else {
         return;
@@ -120,32 +121,25 @@ fn update_positions(
         if next_pos != current_pos.0 {
             current_pos.0 = next_pos;
 
-            journey.path.push(*current_pos);
-            journey.index += 1;
-
-            if journey_finished(journey) {
+            if journey_finished(&journey, &current_pos) {
                 commands.trigger_targets(JourneyFinished, entity)
+            } else {
+                journey.path.push(*current_pos);
+            }
+
+            // move all bots
+            for (mut bot_pos, mut bot_journey) in bot_positions.iter_mut() {
+                bot_journey.bot_index = (bot_journey.bot_index + 1) % bot_journey.path.len();
+                *bot_pos = bot_journey.path[bot_journey.bot_index]
             }
         }
     }
 }
 
-fn journey_finished(journey: Mut<Journey>) -> bool {
-    let Some(target_index) = journey
-        .path
-        .iter()
-        .rposition(|pos| pos.0 == journey.target_pos.0)
-    else {
-        return false;
-    };
-    let Some(back_to_start_index) = journey
-        .path
-        .iter()
-        .rposition(|pos| pos.0 == journey.start_pos.0)
-    else {
-        return false;
-    };
-    target_index < back_to_start_index
+fn journey_finished(journey: &Journey, current_pos: &Position) -> bool {
+    let has_reached_target = journey.path.contains(&journey.target_pos);
+    let back_to_start = *current_pos == journey.start_pos;
+    has_reached_target && back_to_start
 }
 
 fn add_new_character(
@@ -197,6 +191,11 @@ fn draw_grid(mut gizmos: Gizmos) {
 }
 fn draw_targets(mut gizmos: Gizmos, journeys: Query<&Journey>) {
     for journey in journeys.iter() {
+        gizmos.circle_2d(
+            position_translation(&journey.start_pos) + CELL_SIZE / 2.,
+            CELL_SIZE / 2. * 0.95,
+            journey.color,
+        );
         gizmos.circle_2d(
             position_translation(&journey.target_pos) + CELL_SIZE / 2.,
             CELL_SIZE / 2. * 0.95,
