@@ -1,4 +1,5 @@
 use bevy::{color::palettes::css::*, prelude::*, sprite::Anchor};
+use rand::seq::SliceRandom;
 use rand::Rng;
 
 pub(super) fn plugin(app: &mut App) {
@@ -31,8 +32,7 @@ fn spawn_player(
     asset_server: Res<AssetServer>,
     mut characters: ResMut<Characters>,
 ) {
-    let start_pos = rand_position();
-    let target_pos = rand_position();
+    let (start_pos, target_pos) = rand_journey_target();
 
     let color = Color::Srgba(COLORS[characters.color_index % COLORS.len()]);
     characters.color_index += 1;
@@ -65,16 +65,41 @@ fn spawn_player(
     ));
 }
 
-fn rand_position() -> Position {
-    Position(IVec2::new(
-        rand::thread_rng().gen_range(0..GRID_SIZE.x) as i32,
-        rand::thread_rng().gen_range(0..GRID_SIZE.y) as i32,
-    ))
+#[derive(Debug, Clone, Copy)]
+enum Side {
+    Top,
+    Down,
+    Left,
+    Right,
 }
 
-const COLORS: [Srgba; 11] = [
-    AQUA, RED, BLUE, FUCHSIA, GREEN, LIME, NAVY, OLIVE, PURPLE, TEAL, YELLOW,
-];
+impl Side {
+    fn rand_position(self) -> Position {
+        let mut rng = rand::thread_rng();
+        let (x, y) = match self {
+            Self::Top => (rng.gen_range(1..GRID_SIZE.x - 1), (GRID_SIZE.y - 1)),
+            Self::Down => (rng.gen_range(1..GRID_SIZE.x - 1), 0),
+            Self::Left => (0, rng.gen_range(1..GRID_SIZE.y - 1)),
+            Self::Right => ((GRID_SIZE.x - 1), rng.gen_range(1..GRID_SIZE.y - 1)),
+        };
+        Position(IVec2::new(x as i32, y as i32))
+    }
+}
+
+fn rand_journey_target() -> (Position, Position) {
+    let mut rng = rand::thread_rng();
+
+    let sides: Vec<Side> = [Side::Top, Side::Down, Side::Left, Side::Right]
+        .choose_multiple(&mut rng, 2)
+        .cloned()
+        .collect();
+
+    let start_pos = sides[0].rand_position();
+    let target_pos = sides[1].rand_position();
+    (start_pos, target_pos)
+}
+
+const COLORS: [Srgba; 5] = [YELLOW, AQUA, RED, FUCHSIA, LIME];
 
 const GRID_SIZE: UVec2 = UVec2::new(8, 8);
 const CELL_SIZE: f32 = 80.;
@@ -194,16 +219,16 @@ fn draw_grid(mut gizmos: Gizmos) {
         )
         .outer_edges();
 }
-fn draw_targets(mut gizmos: Gizmos, journeys: Query<&Journey>) {
+fn draw_targets(mut gizmos: Gizmos, journeys: Query<&Journey, With<Player>>) {
     for journey in journeys.iter() {
         gizmos.circle_2d(
             position_translation(&journey.start_pos) + CELL_SIZE / 2.,
-            CELL_SIZE / 2. * journey.scale,
+            CELL_SIZE / 2. * 1.1,
             journey.color,
         );
         gizmos.circle_2d(
             position_translation(&journey.target_pos) + CELL_SIZE / 2.,
-            CELL_SIZE / 2. * journey.scale,
+            CELL_SIZE / 2. * 1.1,
             journey.color,
         );
     }
