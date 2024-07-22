@@ -6,6 +6,7 @@
 
 use bevy::asset::AssetMetaCheck;
 use bevy::prelude::*;
+use bevy::window::WindowResolution;
 mod game;
 
 fn main() {
@@ -24,6 +25,7 @@ fn main() {
                         title: "Bevy Jam #5 - Cycles".to_string(),
                         fit_canvas_to_parent: true,
                         prevent_default_event_handling: true,
+                        resolution: WindowResolution::new(800., 800.),
                         ..default()
                     }
                     .into(),

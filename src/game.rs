@@ -1,5 +1,4 @@
 use bevy::{color::palettes::css::*, prelude::*, sprite::Anchor};
-use rand::seq::SliceRandom;
 use rand::Rng;
 
 pub(super) fn plugin(app: &mut App) {
@@ -14,16 +13,29 @@ pub(super) fn plugin(app: &mut App) {
                 draw_paths,
             ),
         )
-        .observe(add_new_character);
+        .init_resource::<Characters>()
+        .observe(add_new_character_on_finished_journey);
 }
 
 pub fn setup_camera(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 }
 
-fn spawn_player(mut commands: Commands, asset_server: Res<AssetServer>) {
+#[derive(Debug, Resource, Default)]
+struct Characters {
+    color_index: usize,
+}
+
+fn spawn_player(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut characters: ResMut<Characters>,
+) {
     let start_pos = rand_position();
     let target_pos = rand_position();
+
+    let color = Color::Srgba(COLORS[characters.color_index % COLORS.len()]);
+    characters.color_index += 1;
 
     commands.spawn((
         Player,
@@ -32,6 +44,7 @@ fn spawn_player(mut commands: Commands, asset_server: Res<AssetServer>) {
             sprite: Sprite {
                 custom_size: Some(Vec2::splat(CELL_SIZE)),
                 anchor: Anchor::BottomLeft,
+                color,
                 ..default()
             },
             transform: Transform::from_translation(Vec3::from((
@@ -46,7 +59,8 @@ fn spawn_player(mut commands: Commands, asset_server: Res<AssetServer>) {
             bot_index: 0,
             start_pos,
             target_pos,
-            color: rand_color(),
+            color,
+            scale: rand::thread_rng().gen_range(0.6..0.9),
         },
     ));
 }
@@ -58,30 +72,11 @@ fn rand_position() -> Position {
     ))
 }
 
-fn rand_color() -> Color {
-    const COLORS: [Srgba; 15] = [
-        LIGHT_BLUE,
-        LIGHT_CORAL,
-        LIGHT_CYAN,
-        LIGHT_GOLDENROD_YELLOW,
-        LIGHT_GRAY,
-        LIGHT_GREEN,
-        LIGHT_GREY,
-        LIGHT_PINK,
-        LIGHT_SALMON,
-        LIGHT_SEA_GREEN,
-        LIGHT_SKY_BLUE,
-        LIGHT_SLATE_GRAY,
-        LIGHT_SLATE_GREY,
-        LIGHT_STEEL_BLUE,
-        LIGHT_YELLOW,
-    ];
+const COLORS: [Srgba; 11] = [
+    AQUA, RED, BLUE, FUCHSIA, GREEN, LIME, NAVY, OLIVE, PURPLE, TEAL, YELLOW,
+];
 
-    let mut rng = rand::thread_rng();
-    Color::Srgba(*COLORS.choose(&mut rng).unwrap())
-}
-
-const GRID_SIZE: UVec2 = UVec2::new(16, 9);
+const GRID_SIZE: UVec2 = UVec2::new(8, 8);
 const CELL_SIZE: f32 = 80.;
 
 #[derive(Debug, Component, Clone, Copy, PartialEq, Eq)]
@@ -99,7 +94,9 @@ struct Journey {
     target_pos: Position,
     path: Vec<Position>,
     bot_index: usize,
+    // display
     color: Color,
+    scale: f32,
 }
 
 #[derive(Event)]
@@ -142,10 +139,12 @@ fn journey_finished(journey: &Journey, current_pos: &Position) -> bool {
     has_reached_target && back_to_start
 }
 
-fn add_new_character(
+fn add_new_character_on_finished_journey(
     trigger: Trigger<JourneyFinished>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    mut sprites: Query<&mut Sprite>,
+    characters: ResMut<Characters>,
 ) {
     // Current character becomes a bot
     commands
@@ -153,7 +152,13 @@ fn add_new_character(
         .remove::<Player>()
         .insert(Automated);
 
-    spawn_player(commands, asset_server)
+    sprites
+        .get_mut(trigger.entity())
+        .expect("Bot sprite")
+        .color
+        .set_alpha(0.3);
+
+    spawn_player(commands, asset_server, characters);
 }
 
 fn keyboard_direction(keyboard: &Res<ButtonInput<KeyCode>>) -> Option<IVec2> {
@@ -193,12 +198,12 @@ fn draw_targets(mut gizmos: Gizmos, journeys: Query<&Journey>) {
     for journey in journeys.iter() {
         gizmos.circle_2d(
             position_translation(&journey.start_pos) + CELL_SIZE / 2.,
-            CELL_SIZE / 2. * 0.95,
+            CELL_SIZE / 2. * journey.scale,
             journey.color,
         );
         gizmos.circle_2d(
             position_translation(&journey.target_pos) + CELL_SIZE / 2.,
-            CELL_SIZE / 2. * 0.95,
+            CELL_SIZE / 2. * journey.scale,
             journey.color,
         );
     }
@@ -209,8 +214,8 @@ fn draw_paths(mut gizmos: Gizmos, journeys: Query<&Journey>) {
             gizmos.rect_2d(
                 position_translation(pos) + CELL_SIZE / 2.,
                 0.,
-                Vec2::splat(CELL_SIZE * 0.95),
-                journey.color,
+                Vec2::splat(CELL_SIZE * journey.scale),
+                journey.color.with_alpha(0.05),
             );
         }
     }
