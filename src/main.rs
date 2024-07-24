@@ -9,7 +9,7 @@ use bevy::prelude::*;
 use bevy::window::WindowResolution;
 mod game;
 
-const WINDOW_SIZE: f32 = 800.;
+const WINDOW_SIZE: f32 = 600.;
 
 fn main() {
     App::new()
