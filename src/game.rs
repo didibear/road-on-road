@@ -7,12 +7,14 @@ pub(super) fn plugin(app: &mut App) {
         .add_systems(
             Update,
             (
-                update_positions,
-                position_to_transform,
-                draw_grid,
-                draw_targets,
-                draw_paths,
-            ),
+                (
+                    update_positions,
+                    move_transit_entities,
+                    position_to_transform,
+                ),
+                (draw_grid, draw_targets, draw_paths),
+            )
+                .chain(),
         )
         .init_resource::<Characters>()
         .observe(add_new_character_on_finished_journey);
@@ -55,7 +57,7 @@ fn spawn_player(
         },
         start_pos,
         Journey {
-            path: Vec::from([start_pos]),
+            path: Vec::new(),
             bot_index: 0,
             start_pos,
             target_pos,
@@ -107,6 +109,21 @@ const CELL_SIZE: f32 = 80.;
 #[derive(Debug, Component, Clone, Copy, PartialEq, Eq)]
 struct Position(IVec2);
 
+#[derive(Debug, Component, Clone, Copy, PartialEq)]
+struct Transition {
+    start: Position,
+    end: Position,
+    current: Vec2,
+}
+impl Transition {
+    fn new(start: Position, end: Position) -> Self {
+        Self {
+            start,
+            end,
+            current: start.0.as_vec2(),
+        }
+    }
+}
 #[derive(Debug, Component)]
 struct Player;
 
@@ -130,30 +147,58 @@ struct JourneyFinished;
 fn update_positions(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
-    mut positions: Query<(Entity, &mut Position, &mut Journey), With<Player>>,
-    mut bot_positions: Query<(&mut Position, &mut Journey), (With<Automated>, Without<Player>)>,
+    mut positions: Query<(Entity, &Position, &mut Journey), (With<Player>, Without<Transition>)>,
+    mut bot_positions: Query<(Entity, &Position, &mut Journey), (With<Automated>, Without<Player>)>,
 ) {
     let Some(direction) = keyboard_direction(&keyboard) else {
         return;
     };
 
-    for (entity, mut current_pos, mut journey) in positions.iter_mut() {
-        let next_pos = (current_pos.0 + direction).clamp(IVec2::ZERO, GRID_SIZE.as_ivec2() - 1);
+    for (entity, current_pos, mut journey) in positions.iter_mut() {
+        let next_pos =
+            Position((current_pos.0 + direction).clamp(IVec2::ZERO, GRID_SIZE.as_ivec2() - 1));
 
-        if next_pos != current_pos.0 {
-            current_pos.0 = next_pos;
+        if next_pos != *current_pos {
+            commands
+                .entity(entity)
+                .insert(Transition::new(*current_pos, next_pos));
 
-            if journey_finished(&journey, &current_pos) {
+            journey.path.push(*current_pos);
+
+            // TODO: Manage journey finished after transition
+            if journey_finished(&journey, &next_pos) {
                 commands.trigger_targets(JourneyFinished, entity)
-            } else {
-                journey.path.push(*current_pos);
             }
 
-            // move all bots
-            for (mut bot_pos, mut bot_journey) in bot_positions.iter_mut() {
+            for (entity, bot_pos, mut bot_journey) in bot_positions.iter_mut() {
                 bot_journey.bot_index = (bot_journey.bot_index + 1) % bot_journey.path.len();
-                *bot_pos = bot_journey.path[bot_journey.bot_index]
+
+                commands.entity(entity).insert(Transition::new(
+                    *bot_pos,
+                    bot_journey.path[bot_journey.bot_index],
+                ));
             }
+        }
+    }
+}
+
+const SPEED: f32 = CELL_SIZE / 6.;
+
+fn move_transit_entities(
+    mut commands: Commands,
+    mut transitions: Query<(Entity, &mut Transition, &mut Position)>,
+    time: Res<Time>,
+) {
+    // current_pos.0 = next_pos;
+    for (entity, mut transition, mut pos) in transitions.iter_mut() {
+        let direction =
+            (transition.end.0.as_vec2() - transition.start.0.as_vec2()).normalize_or_zero();
+
+        transition.current += SPEED * direction * time.delta_seconds();
+
+        if transition.start.0.as_vec2().distance(transition.current) >= 1. {
+            commands.entity(entity).remove::<Transition>();
+            *pos = transition.end;
         }
     }
 }
@@ -246,12 +291,25 @@ fn draw_paths(mut gizmos: Gizmos, journeys: Query<&Journey>) {
     }
 }
 
-fn position_to_transform(mut positions: Query<(&mut Transform, &Position), Changed<Position>>) {
-    for (mut transform, pos) in positions.iter_mut() {
+fn position_to_transform(
+    mut changed_position: Query<
+        (&mut Transform, &Position),
+        (Changed<Position>, Without<Transition>),
+    >,
+    mut in_transition: Query<(&mut Transform, &Transition), Changed<Transition>>,
+) {
+    for (mut transform, pos) in changed_position.iter_mut() {
         transform.translation = Vec3::from((position_translation(pos), 0.));
+    }
+    for (mut transform, transition) in in_transition.iter_mut() {
+        transform.translation = Vec3::from((grid_position_translation(transition.current), 0.));
     }
 }
 
 fn position_translation(pos: &Position) -> Vec2 {
-    pos.0.as_vec2() * CELL_SIZE - GRID_SIZE.as_vec2() * CELL_SIZE / 2.
+    grid_position_translation(pos.0.as_vec2())
+}
+
+fn grid_position_translation(pos: Vec2) -> Vec2 {
+    pos * CELL_SIZE - GRID_SIZE.as_vec2() * CELL_SIZE / 2.
 }
