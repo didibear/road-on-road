@@ -9,6 +9,8 @@ use bevy::prelude::*;
 use bevy::window::WindowResolution;
 mod game;
 
+const WINDOW_SIZE: f32 = 800.;
+
 fn main() {
     App::new()
         .add_plugins(
@@ -25,7 +27,7 @@ fn main() {
                         title: "Bevy Jam #5 - Cycles".to_string(),
                         fit_canvas_to_parent: true,
                         prevent_default_event_handling: true,
-                        resolution: WindowResolution::new(800., 800.),
+                        resolution: WindowResolution::new(WINDOW_SIZE, WINDOW_SIZE),
                         ..default()
                     }
                     .into(),

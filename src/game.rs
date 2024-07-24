@@ -1,18 +1,27 @@
+use std::f32::consts::PI;
+
 use bevy::{color::palettes::css::*, prelude::*, sprite::Anchor};
 use rand::seq::SliceRandom;
 use rand::Rng;
+
+use crate::WINDOW_SIZE;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(Startup, (setup_camera, spawn_player))
         .add_systems(
             Update,
             (
+                // logic
                 (
-                    update_positions,
+                    handle_input_movement,
                     move_transit_entities,
-                    position_to_transform,
+                    detect_collisions,
+                    destroyed_animation,
                 ),
-                (draw_grid, draw_targets, draw_paths),
+                // drawing
+                position_to_transform,
+                (draw_grid, draw_paths),
+                draw_targets,
             )
                 .chain(),
         )
@@ -33,28 +42,17 @@ fn spawn_player(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut characters: ResMut<Characters>,
+    positions: Query<&Position>,
 ) {
-    let (start_pos, target_pos) = rand_journey_target();
+    let avoid_positions: Vec<&Position> = positions.iter().collect();
+    let (start_pos, target_pos) = rand_journey_target(avoid_positions);
 
     let color = Color::Srgba(COLORS[characters.color_index % COLORS.len()]);
     characters.color_index += 1;
 
     commands.spawn((
         Player,
-        SpriteBundle {
-            texture: asset_server.load("ducky.png"),
-            sprite: Sprite {
-                custom_size: Some(Vec2::splat(CELL_SIZE)),
-                anchor: Anchor::BottomLeft,
-                color,
-                ..default()
-            },
-            transform: Transform::from_translation(Vec3::from((
-                position_translation(&start_pos),
-                0.,
-            ))),
-            ..default()
-        },
+        character_sprite(&asset_server, color, start_pos),
         start_pos,
         Journey {
             path: Vec::new(),
@@ -65,6 +63,20 @@ fn spawn_player(
             scale: rand::thread_rng().gen_range(0.6..0.9),
         },
     ));
+}
+
+fn character_sprite(asset_server: &AssetServer, color: Color, start_pos: Position) -> SpriteBundle {
+    SpriteBundle {
+        texture: asset_server.load("ducky.png"),
+        sprite: Sprite {
+            custom_size: Some(Vec2::splat(CELL_SIZE)),
+            anchor: Anchor::Center,
+            color,
+            ..default()
+        },
+        transform: Transform::from_translation(Vec3::from((position_translation(&start_pos), 0.))),
+        ..default()
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -88,23 +100,29 @@ impl Side {
     }
 }
 
-fn rand_journey_target() -> (Position, Position) {
+fn rand_journey_target(avoid_positions: Vec<&Position>) -> (Position, Position) {
     let mut rng = rand::thread_rng();
 
-    let sides: Vec<Side> = [Side::Top, Side::Down, Side::Left, Side::Right]
-        .choose_multiple(&mut rng, 2)
-        .cloned()
-        .collect();
+    loop {
+        let sides: Vec<Side> = [Side::Top, Side::Down, Side::Left, Side::Right]
+            .choose_multiple(&mut rng, 2)
+            .cloned()
+            .collect();
 
-    let start_pos = sides[0].rand_position();
-    let target_pos = sides[1].rand_position();
-    (start_pos, target_pos)
+        let start_pos = sides[0].rand_position();
+        let target_pos = sides[1].rand_position();
+
+        if avoid_positions.contains(&&start_pos) {
+            continue;
+        }
+        return (start_pos, target_pos);
+    }
 }
 
 const COLORS: [Srgba; 5] = [YELLOW, AQUA, RED, FUCHSIA, LIME];
 
-const GRID_SIZE: UVec2 = UVec2::new(8, 8);
-const CELL_SIZE: f32 = 80.;
+const GRID_SIZE: UVec2 = UVec2::new(6, 6);
+const CELL_SIZE: f32 = WINDOW_SIZE / 10.;
 
 #[derive(Debug, Component, Clone, Copy, PartialEq, Eq)]
 struct Position(IVec2);
@@ -131,6 +149,9 @@ struct Player;
 struct Automated;
 
 #[derive(Debug, Component)]
+struct Destroyed;
+
+#[derive(Debug, Component)]
 struct Journey {
     start_pos: Position,
     target_pos: Position,
@@ -144,7 +165,7 @@ struct Journey {
 #[derive(Event)]
 struct JourneyFinished;
 
-fn update_positions(
+fn handle_input_movement(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut positions: Query<(Entity, &Position, &mut Journey), (With<Player>, Without<Transition>)>,
@@ -215,6 +236,7 @@ fn add_new_character_on_finished_journey(
     asset_server: Res<AssetServer>,
     mut sprites: Query<&mut Sprite>,
     characters: ResMut<Characters>,
+    positions: Query<&Position>,
 ) {
     // Current character becomes a bot
     commands
@@ -228,7 +250,7 @@ fn add_new_character_on_finished_journey(
         .color
         .set_alpha(0.3);
 
-    spawn_player(commands, asset_server, characters);
+    spawn_player(commands, asset_server, characters, positions);
 }
 
 fn keyboard_direction(keyboard: &Res<ButtonInput<KeyCode>>) -> Option<IVec2> {
@@ -251,6 +273,101 @@ fn keyboard_direction(keyboard: &Res<ButtonInput<KeyCode>>) -> Option<IVec2> {
         };
     }
     None
+}
+
+fn detect_collisions(
+    mut commands: Commands,
+    locations: Query<(Entity, &Transform, &Journey)>,
+    players: Query<Entity, With<Player>>,
+    journeys: Query<&Journey>,
+    asset_server: Res<AssetServer>,
+    mut sprites: Query<&mut Sprite>,
+) {
+    for [(entity_a, transform_a, journey_a), (entity_b, transform_b, _)] in
+        locations.iter_combinations()
+    {
+        if transform_a.translation.distance(transform_b.translation) <= CELL_SIZE / 2. {
+            let destroyed_entity = {
+                // player die first
+                if players.get(entity_a).is_ok() {
+                    // unless they just spawn
+                    if journey_a.path.len() <= 1 {
+                        continue;
+                    }
+                    entity_a
+                } else {
+                    entity_b
+                }
+            };
+
+            commands
+                .entity(destroyed_entity)
+                .remove::<(Position, Player, Automated)>()
+                .insert(Destroyed);
+
+            let was_player = players.get(destroyed_entity).is_ok();
+            let journey = journeys.get(destroyed_entity).expect("Journey on destroy");
+
+            if was_player {
+                sprites
+                    .get_mut(destroyed_entity)
+                    .expect("Bot sprite")
+                    .color
+                    .set_alpha(0.3);
+
+                commands.spawn((
+                    Player,
+                    character_sprite(&asset_server, journey.color, journey.start_pos),
+                    journey.start_pos,
+                    Journey {
+                        path: Vec::new(),
+                        ..*journey
+                    },
+                ));
+            }
+        }
+    }
+}
+
+const DESTROYED_SPEED: f32 = CELL_SIZE * 8.;
+const DESTROYED_ROTATION: f32 = 10.;
+
+const SCRAPYARD_LOCATION: Vec2 = Vec2::splat(WINDOW_SIZE * 0.4);
+
+fn destroyed_animation(
+    mut commands: Commands,
+    mut transforms: Query<(Entity, &mut Transform), With<Destroyed>>,
+    time: Res<Time>,
+) {
+    for (entity, mut transform) in transforms.iter_mut() {
+        // let destination = Vec3::from((SCRAPYARD_LOCATION, 0.));
+        let destination =
+            (transform.translation - Vec3::ZERO).normalize_or(Vec3::X) * WINDOW_SIZE * 0.6;
+
+        let noise = Vec3::from((random_noise(CELL_SIZE), 0.));
+
+        let direction = ((destination + noise) - transform.translation).normalize_or_zero();
+        transform.translation += direction * DESTROYED_SPEED * time.delta_seconds();
+        transform.rotate_local_z(-PI * DESTROYED_ROTATION * time.delta_seconds());
+
+        // outside of the grid
+        let margin = CELL_SIZE * 1.5;
+        let playground_size = GRID_SIZE.as_vec2() * 0.5 * CELL_SIZE;
+
+        let playground = Rect {
+            min: -(playground_size + margin + random_noise(CELL_SIZE)),
+            max: playground_size + margin + random_noise(CELL_SIZE),
+        };
+        if !playground.contains(transform.translation.xy()) {
+            commands.entity(entity).remove::<Destroyed>();
+        }
+    }
+}
+
+fn random_noise(length: f32) -> Vec2 {
+    let mut rng = rand::thread_rng();
+
+    Vec2::new(rng.gen::<f32>() - 0.5, rng.gen::<f32>() - 0.5).normalize_or(Vec2::X) * length
 }
 
 fn draw_grid(mut gizmos: Gizmos) {
@@ -299,17 +416,21 @@ fn position_to_transform(
     mut in_transition: Query<(&mut Transform, &Transition), Changed<Transition>>,
 ) {
     for (mut transform, pos) in changed_position.iter_mut() {
-        transform.translation = Vec3::from((position_translation(pos), 0.));
+        transform.translation = Vec3::from((sprite_position_translation(pos.0.as_vec2()), 0.));
     }
     for (mut transform, transition) in in_transition.iter_mut() {
-        transform.translation = Vec3::from((grid_position_translation(transition.current), 0.));
+        transform.translation = Vec3::from((sprite_position_translation(transition.current), 0.));
     }
 }
 
 fn position_translation(pos: &Position) -> Vec2 {
-    grid_position_translation(pos.0.as_vec2())
+    grid_pos_translation(pos.0.as_vec2())
 }
 
-fn grid_position_translation(pos: Vec2) -> Vec2 {
+fn sprite_position_translation(pos: Vec2) -> Vec2 {
+    grid_pos_translation(pos) + CELL_SIZE / 2.
+}
+
+fn grid_pos_translation(pos: Vec2) -> Vec2 {
     pos * CELL_SIZE - GRID_SIZE.as_vec2() * CELL_SIZE / 2.
 }
