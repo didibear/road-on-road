@@ -7,9 +7,18 @@
 use bevy::asset::AssetMetaCheck;
 use bevy::prelude::*;
 use bevy::window::WindowResolution;
-mod game;
+
+mod characters;
+mod components;
+mod destroyed;
+mod draws;
+mod inputs;
+mod movements;
 
 const WINDOW_SIZE: f32 = 600.;
+
+const GRID_SIZE: UVec2 = UVec2::new(6, 6);
+const CELL_SIZE: f32 = WINDOW_SIZE / 10.;
 
 fn main() {
     App::new()
@@ -34,6 +43,33 @@ fn main() {
                     ..default()
                 }),
         )
-        .add_plugins(game::plugin)
+        .add_plugins(game_plugin)
         .run();
+}
+
+pub fn game_plugin(app: &mut App) {
+    app.add_systems(Startup, (setup_camera, characters::spawn_player))
+        .add_systems(
+            Update,
+            (
+                // logic
+                (
+                    inputs::handle_input_movement,
+                    movements::move_transit_entities,
+                    movements::detect_collisions,
+                    destroyed::destroyed_animation,
+                ),
+                // drawing
+                movements::position_to_transform,
+                (draws::draw_grid, draws::draw_paths),
+                draws::draw_targets,
+            )
+                .chain(),
+        )
+        .init_resource::<characters::Characters>()
+        .observe(characters::add_new_character_on_finished_journey);
+}
+
+pub fn setup_camera(mut commands: Commands) {
+    commands.spawn(Camera2dBundle::default());
 }
