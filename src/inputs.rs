@@ -8,11 +8,12 @@ use bevy::prelude::*;
 pub fn handle_input_movement(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
+    touches: Res<Touches>,
     mut positions: Query<(Entity, &Position, &mut Journey), (With<Player>, Without<Transition>)>,
     mut bot_positions: Query<(Entity, &Position, &mut Journey), (With<Automated>, Without<Player>)>,
     assets: Res<AllAssets>,
 ) {
-    let Some(direction) = keyboard_direction(&keyboard) else {
+    let Some(direction) = keyboard_direction(&keyboard).or_else(|| touch_direction(touches)) else {
         return;
     };
 
@@ -60,8 +61,9 @@ pub fn just_reached_target(journey: &Journey, current_pos: &Position) -> bool {
     at_target && never_before
 }
 
+const DIRECTIONS: [IVec2; 4] = [IVec2::Y, IVec2::NEG_Y, IVec2::NEG_X, IVec2::X];
+
 fn keyboard_direction(keyboard: &Res<ButtonInput<KeyCode>>) -> Option<IVec2> {
-    const DIRECTIONS: [IVec2; 4] = [IVec2::Y, IVec2::NEG_Y, IVec2::NEG_X, IVec2::X];
     const ARROW_KEYS: [KeyCode; 4] = [
         KeyCode::ArrowUp,
         KeyCode::ArrowDown,
@@ -80,4 +82,29 @@ fn keyboard_direction(keyboard: &Res<ButtonInput<KeyCode>>) -> Option<IVec2> {
         };
     }
     None
+}
+
+fn touch_direction(touches: Res<Touches>) -> Option<IVec2> {
+    let touch = touches.iter_just_released().next()?;
+    dbg!(&touch);
+
+    let mut direction = touch.distance().normalize_or_zero();
+    if direction == Vec2::ZERO {
+        return None;
+    }
+
+    // The screen seems to swap these two
+    direction.x = -direction.x;
+
+    let closest_direction = DIRECTIONS
+        .iter()
+        .max_by(|a, b| {
+            a.as_vec2()
+                .distance_squared(direction)
+                .partial_cmp(&b.as_vec2().distance_squared(direction))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .cloned();
+
+    closest_direction
 }
