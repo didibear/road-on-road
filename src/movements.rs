@@ -57,7 +57,7 @@ pub fn move_transit_entities(
 
 pub fn detect_collisions(
     mut commands: Commands,
-    locations: Query<(Entity, &Transform, &Journey), Or<(With<Player>, With<Automated>)>>,
+    locations: Query<(Entity, &Transform, &Journey), WithPlayerOrAutomated>,
     players: Query<Entity, With<Player>>,
     journeys: Query<&Journey>,
     assets: Res<AllAssets>,

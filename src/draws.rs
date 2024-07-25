@@ -33,7 +33,7 @@ pub fn draw_targets(mut gizmos: Gizmos, journeys: Query<&Journey, With<Player>>)
     }
 }
 
-pub fn draw_paths(mut gizmos: Gizmos, journeys: Query<&Journey>) {
+pub fn draw_paths(mut gizmos: Gizmos, journeys: Query<&Journey, WithPlayerOrAutomated>) {
     for journey in journeys.iter() {
         for pos in journey.path.iter() {
             gizmos.rect_2d(

@@ -20,7 +20,7 @@ impl Score {
 pub struct ScoreDisplay;
 
 pub fn update_max_nb_characters(
-    characters: Query<Entity, Or<(With<Automated>, With<Player>)>>,
+    characters: Query<Entity, WithPlayerOrAutomated>,
     mut score: ResMut<Score>,
 ) {
     score.max_nb_characters = score
