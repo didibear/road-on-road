@@ -5,6 +5,7 @@
 #![allow(clippy::too_many_arguments, clippy::type_complexity)]
 
 use bevy::asset::AssetMetaCheck;
+use bevy::audio::{AudioPlugin, Volume};
 use bevy::prelude::*;
 use bevy::window::WindowResolution;
 use bevy_asset_loader::prelude::*;
@@ -16,6 +17,7 @@ mod draws;
 mod inputs;
 mod movements;
 mod scores;
+mod sounds;
 mod tutorial;
 
 const WINDOW_SIZE: f32 = 600.;
@@ -43,6 +45,10 @@ fn main() {
                         ..default()
                     }
                     .into(),
+                    ..default()
+                })
+                .set(AudioPlugin {
+                    global_volume: GlobalVolume::new(0.3),
                     ..default()
                 }),
         )
@@ -104,6 +110,12 @@ pub struct AllAssets {
 
     #[asset(path = "audio/move", collection(typed))]
     move_sound: Vec<Handle<AudioSource>>,
+    #[asset(path = "audio/hurt", collection(typed))]
+    hurt_sound: Vec<Handle<AudioSource>>,
+    #[asset(path = "audio/coin.ogg")]
+    coin_sound: Handle<AudioSource>,
+    #[asset(path = "audio/goal.ogg")]
+    goal_sound: Handle<AudioSource>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States)]

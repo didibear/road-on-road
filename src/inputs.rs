@@ -1,11 +1,16 @@
-use crate::{components::*, GRID_SIZE};
+use crate::{
+    components::*,
+    sounds::{play_random_sound, play_sound},
+    AllAssets, GRID_SIZE,
+};
 use bevy::prelude::*;
 
-pub(crate) fn handle_input_movement(
+pub fn handle_input_movement(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut positions: Query<(Entity, &Position, &mut Journey), (With<Player>, Without<Transition>)>,
     mut bot_positions: Query<(Entity, &Position, &mut Journey), (With<Automated>, Without<Player>)>,
+    assets: Res<AllAssets>,
 ) {
     let Some(direction) = keyboard_direction(&keyboard) else {
         return;
@@ -20,11 +25,16 @@ pub(crate) fn handle_input_movement(
                 .entity(entity)
                 .insert(Transition::new(*current_pos, next_pos));
 
+            commands.spawn(play_random_sound(&assets.move_sound));
+
             journey.path.push(*current_pos);
 
             // TODO: Manage journey finished after transition
             if journey_finished(&journey, &next_pos) {
-                commands.trigger_targets(JourneyFinished, entity)
+                commands.trigger_targets(JourneyFinished, entity);
+                commands.spawn(play_sound(&assets.coin_sound));
+            } else if just_reached_target(&journey, &next_pos) {
+                commands.spawn(play_sound(&assets.goal_sound));
             }
 
             for (entity, bot_pos, mut bot_journey) in bot_positions.iter_mut() {
@@ -43,6 +53,11 @@ pub fn journey_finished(journey: &Journey, current_pos: &Position) -> bool {
     let has_reached_target = journey.path.contains(&journey.target_pos);
     let back_to_start = *current_pos == journey.start_pos;
     has_reached_target && back_to_start
+}
+pub fn just_reached_target(journey: &Journey, current_pos: &Position) -> bool {
+    let at_target = *current_pos == journey.target_pos;
+    let never_before = !journey.path.contains(&journey.target_pos);
+    at_target && never_before
 }
 
 fn keyboard_direction(keyboard: &Res<ButtonInput<KeyCode>>) -> Option<IVec2> {

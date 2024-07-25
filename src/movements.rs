@@ -1,5 +1,7 @@
 use crate::characters;
 use crate::components::*;
+use crate::sounds::play_random_sound;
+use crate::AllAssets;
 use bevy::prelude::*;
 
 use crate::CELL_SIZE;
@@ -55,10 +57,10 @@ pub fn move_transit_entities(
 
 pub fn detect_collisions(
     mut commands: Commands,
-    locations: Query<(Entity, &Transform, &Journey)>,
+    locations: Query<(Entity, &Transform, &Journey), Or<(With<Player>, With<Automated>)>>,
     players: Query<Entity, With<Player>>,
     journeys: Query<&Journey>,
-    asset_server: Res<AssetServer>,
+    assets: Res<AllAssets>,
     mut sprites: Query<&mut Sprite>,
 ) {
     for [(entity_a, transform_a, journey_a), (entity_b, transform_b, _)] in
@@ -82,6 +84,8 @@ pub fn detect_collisions(
                 .entity(destroyed_entity)
                 .remove::<(Position, Player, Automated)>()
                 .insert(Destroyed);
+
+            commands.spawn(play_random_sound(&assets.hurt_sound));
 
             let was_player = players.get(destroyed_entity).is_ok();
             let journey = journeys.get(destroyed_entity).expect("Journey on destroy");
