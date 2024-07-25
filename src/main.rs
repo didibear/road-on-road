@@ -57,70 +57,75 @@ fn main() {
 }
 
 pub fn game_plugin(app: &mut App) {
-    app.init_state::<GameState>()
-        .add_loading_state(
-            LoadingState::new(GameState::AssetLoading)
-                .continue_to_state(GameState::Game)
-                .load_collection::<AllAssets>(),
-        )
-        .add_systems(
-            OnEnter(GameState::Game),
+    app.add_systems(
+        Startup,
+        (
+            setup_camera,
+            characters::spawn_first_player,
+            scores::spawn_score_display,
+        ),
+    )
+    .add_systems(
+        Update,
+        (
+            // logic
             (
-                setup_camera,
-                characters::spawn_first_player,
-                scores::spawn_score_display,
+                inputs::handle_input_movement,
+                movements::move_transit_entities,
+                movements::detect_collisions,
+                destroyed::destroyed_animation,
+                tutorial::validate_first_tutorial,
+                scores::update_max_nb_characters,
+                scores::update_score_display,
             ),
+            // drawing
+            movements::position_to_transform,
+            (draws::draw_grid, draws::draw_paths),
+            draws::draw_targets,
         )
-        .add_systems(
-            Update,
-            (
-                // logic
-                (
-                    inputs::handle_input_movement,
-                    movements::move_transit_entities,
-                    movements::detect_collisions,
-                    destroyed::destroyed_animation,
-                    tutorial::validate_first_tutorial,
-                    scores::update_max_nb_characters,
-                    scores::update_score_display,
-                ),
-                // drawing
-                movements::position_to_transform,
-                (draws::draw_grid, draws::draw_paths),
-                draws::draw_targets,
-            )
-                .chain()
-                .run_if(in_state(GameState::Game)),
-        )
-        .init_resource::<characters::Characters>()
-        .init_resource::<scores::Score>()
-        .observe(characters::add_new_character_on_finished_journey)
-        .observe(tutorial::spawn_first_tutorial)
-        .observe(scores::score_nb_journeys);
+            .chain(),
+    )
+    .init_resource::<characters::Characters>()
+    .init_resource::<scores::Score>()
+    .init_resource::<AllAssets>()
+    .observe(characters::add_new_character_on_finished_journey)
+    .observe(tutorial::spawn_first_tutorial)
+    .observe(scores::score_nb_journeys);
 }
 
 pub fn setup_camera(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 }
 
-#[derive(AssetCollection, Resource)]
+#[derive(Debug, Resource)]
 pub struct AllAssets {
-    #[asset(path = "images/ducky.png")]
     character_sprite: Handle<Image>,
-
-    #[asset(path = "audio/move", collection(typed))]
     move_sound: Vec<Handle<AudioSource>>,
-    #[asset(path = "audio/hurt", collection(typed))]
     hurt_sound: Vec<Handle<AudioSource>>,
-    #[asset(path = "audio/coin.ogg")]
     coin_sound: Handle<AudioSource>,
-    #[asset(path = "audio/goal.ogg")]
     goal_sound: Handle<AudioSource>,
 }
 
-#[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States)]
-pub enum GameState {
-    #[default]
-    AssetLoading,
-    Game,
+impl FromWorld for AllAssets {
+    fn from_world(world: &mut World) -> Self {
+        let asset_server = world.resource::<AssetServer>();
+
+        Self {
+            // itch only supports assets directly in the `assets/` directory
+            character_sprite: asset_server.load("ducky.png"),
+            move_sound: vec![
+                asset_server.load("move1.ogg"),
+                asset_server.load("move2.ogg"),
+                asset_server.load("move3.ogg"),
+                asset_server.load("move4.ogg"),
+            ],
+            hurt_sound: vec![
+                asset_server.load("hurt1.ogg"),
+                asset_server.load("hurt2.ogg"),
+                asset_server.load("hurt3.ogg"),
+            ],
+            coin_sound: asset_server.load("coin.ogg"),
+            goal_sound: asset_server.load("goal.ogg"),
+        }
+    }
 }
