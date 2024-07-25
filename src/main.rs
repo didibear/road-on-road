@@ -14,6 +14,7 @@ mod destroyed;
 mod draws;
 mod inputs;
 mod movements;
+mod scores;
 mod tutorial;
 
 const WINDOW_SIZE: f32 = 600.;
@@ -49,28 +50,39 @@ fn main() {
 }
 
 pub fn game_plugin(app: &mut App) {
-    app.add_systems(Startup, (setup_camera, characters::spawn_first_player))
-        .add_systems(
-            Update,
+    app.add_systems(
+        Startup,
+        (
+            setup_camera,
+            characters::spawn_first_player,
+            scores::spawn_score_display,
+        ),
+    )
+    .add_systems(
+        Update,
+        (
+            // logic
             (
-                // logic
-                (
-                    inputs::handle_input_movement,
-                    movements::move_transit_entities,
-                    movements::detect_collisions,
-                    destroyed::destroyed_animation,
-                    tutorial::validate_first_tutorial,
-                ),
-                // drawing
-                movements::position_to_transform,
-                (draws::draw_grid, draws::draw_paths),
-                draws::draw_targets,
-            )
-                .chain(),
+                inputs::handle_input_movement,
+                movements::move_transit_entities,
+                movements::detect_collisions,
+                destroyed::destroyed_animation,
+                tutorial::validate_first_tutorial,
+                scores::update_max_nb_characters,
+                scores::update_score_display,
+            ),
+            // drawing
+            movements::position_to_transform,
+            (draws::draw_grid, draws::draw_paths),
+            draws::draw_targets,
         )
-        .init_resource::<characters::Characters>()
-        .observe(characters::add_new_character_on_finished_journey)
-        .observe(tutorial::spawn_first_tutorial);
+            .chain(),
+    )
+    .init_resource::<characters::Characters>()
+    .init_resource::<scores::Score>()
+    .observe(characters::add_new_character_on_finished_journey)
+    .observe(tutorial::spawn_first_tutorial)
+    .observe(scores::score_nb_journeys);
 }
 
 pub fn setup_camera(mut commands: Commands) {
