@@ -17,4 +17,5 @@ opt-level = 3
 
 [dependencies]
 bevy = "0.14"
+bevy_asset_loader = "0.21.0"
 rand = "0.8.5"

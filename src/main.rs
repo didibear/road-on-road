@@ -7,6 +7,7 @@
 use bevy::asset::AssetMetaCheck;
 use bevy::prelude::*;
 use bevy::window::WindowResolution;
+use bevy_asset_loader::prelude::*;
 
 mod characters;
 mod components;
@@ -50,41 +51,64 @@ fn main() {
 }
 
 pub fn game_plugin(app: &mut App) {
-    app.add_systems(
-        Startup,
-        (
-            setup_camera,
-            characters::spawn_first_player,
-            scores::spawn_score_display,
-        ),
-    )
-    .add_systems(
-        Update,
-        (
-            // logic
-            (
-                inputs::handle_input_movement,
-                movements::move_transit_entities,
-                movements::detect_collisions,
-                destroyed::destroyed_animation,
-                tutorial::validate_first_tutorial,
-                scores::update_max_nb_characters,
-                scores::update_score_display,
-            ),
-            // drawing
-            movements::position_to_transform,
-            (draws::draw_grid, draws::draw_paths),
-            draws::draw_targets,
+    app.init_state::<GameState>()
+        .add_loading_state(
+            LoadingState::new(GameState::AssetLoading)
+                .continue_to_state(GameState::Game)
+                .load_collection::<AllAssets>(),
         )
-            .chain(),
-    )
-    .init_resource::<characters::Characters>()
-    .init_resource::<scores::Score>()
-    .observe(characters::add_new_character_on_finished_journey)
-    .observe(tutorial::spawn_first_tutorial)
-    .observe(scores::score_nb_journeys);
+        .add_systems(
+            OnEnter(GameState::Game),
+            (
+                setup_camera,
+                characters::spawn_first_player,
+                scores::spawn_score_display,
+            ),
+        )
+        .add_systems(
+            Update,
+            (
+                // logic
+                (
+                    inputs::handle_input_movement,
+                    movements::move_transit_entities,
+                    movements::detect_collisions,
+                    destroyed::destroyed_animation,
+                    tutorial::validate_first_tutorial,
+                    scores::update_max_nb_characters,
+                    scores::update_score_display,
+                ),
+                // drawing
+                movements::position_to_transform,
+                (draws::draw_grid, draws::draw_paths),
+                draws::draw_targets,
+            )
+                .chain()
+                .run_if(in_state(GameState::Game)),
+        )
+        .init_resource::<characters::Characters>()
+        .init_resource::<scores::Score>()
+        .observe(characters::add_new_character_on_finished_journey)
+        .observe(tutorial::spawn_first_tutorial)
+        .observe(scores::score_nb_journeys);
 }
 
 pub fn setup_camera(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
+}
+
+#[derive(AssetCollection, Resource)]
+pub struct AllAssets {
+    #[asset(path = "images/ducky.png")]
+    character_sprite: Handle<Image>,
+
+    #[asset(path = "audio/move", collection(typed))]
+    move_sound: Vec<Handle<AudioSource>>,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States)]
+pub enum GameState {
+    #[default]
+    AssetLoading,
+    Game,
 }

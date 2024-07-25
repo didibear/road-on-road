@@ -2,6 +2,7 @@ use crate::components::*;
 use crate::movements;
 use crate::tutorial;
 use crate::tutorial::FirstPlayerAdded;
+use crate::AllAssets;
 use crate::CELL_SIZE;
 use crate::GRID_SIZE;
 use bevy::color::palettes::css::*;
@@ -19,12 +20,12 @@ pub struct Characters {
 
 pub fn spawn_first_player(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
+    assets: Res<AllAssets>,
     characters: ResMut<Characters>,
     positions: Query<&Position>,
 ) {
     let player = commands
-        .spawn(character_bundle(positions, characters, asset_server))
+        .spawn(character_bundle(positions, characters, assets))
         .insert(tutorial::FirstPlayer)
         .id();
 
@@ -34,7 +35,7 @@ pub fn spawn_first_player(
 fn character_bundle(
     positions: Query<&Position>,
     mut characters: ResMut<Characters>,
-    asset_server: Res<AssetServer>,
+    assets: Res<AllAssets>,
 ) -> impl Bundle {
     let avoid_positions: Vec<&Position> = positions.iter().collect();
     let (start_pos, target_pos) = rand_journey_target(avoid_positions);
@@ -44,7 +45,7 @@ fn character_bundle(
 
     (
         Player,
-        character_sprite(&asset_server, color, start_pos),
+        character_sprite(&assets, color, start_pos),
         start_pos,
         Journey {
             path: Vec::new(),
@@ -57,13 +58,9 @@ fn character_bundle(
     )
 }
 
-pub fn character_sprite(
-    asset_server: &AssetServer,
-    color: Color,
-    start_pos: Position,
-) -> SpriteBundle {
+pub fn character_sprite(assets: &AllAssets, color: Color, start_pos: Position) -> SpriteBundle {
     SpriteBundle {
-        texture: asset_server.load("ducky.png"),
+        texture: assets.character_sprite.clone(),
         sprite: Sprite {
             custom_size: Some(Vec2::splat(CELL_SIZE)),
             anchor: Anchor::Center,
@@ -121,7 +118,7 @@ fn rand_journey_target(avoid_positions: Vec<&Position>) -> (Position, Position) 
 pub fn add_new_character_on_finished_journey(
     trigger: Trigger<JourneyFinished>,
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
+    assets: Res<AllAssets>,
     mut sprites: Query<&mut Sprite>,
     characters: ResMut<Characters>,
     positions: Query<&Position>,
@@ -138,5 +135,5 @@ pub fn add_new_character_on_finished_journey(
         .color
         .set_alpha(0.3);
 
-    commands.spawn(character_bundle(positions, characters, asset_server));
+    commands.spawn(character_bundle(positions, characters, assets));
 }

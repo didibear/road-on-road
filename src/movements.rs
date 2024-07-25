@@ -95,7 +95,7 @@ pub fn detect_collisions(
 
                 commands.spawn((
                     Player,
-                    characters::character_sprite(&asset_server, journey.color, journey.start_pos),
+                    characters::character_sprite(&assets, journey.color, journey.start_pos),
                     journey.start_pos,
                     Journey {
                         path: Vec::new(),
