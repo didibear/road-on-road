@@ -1,5 +1,7 @@
 use crate::components::*;
 use crate::movements;
+use crate::tutorial;
+use crate::tutorial::FirstPlayerAdded;
 use crate::CELL_SIZE;
 use crate::GRID_SIZE;
 use bevy::color::palettes::css::*;
@@ -15,19 +17,32 @@ pub struct Characters {
     pub color_index: usize,
 }
 
-pub fn spawn_player(
+pub fn spawn_first_player(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut characters: ResMut<Characters>,
+    characters: ResMut<Characters>,
     positions: Query<&Position>,
 ) {
+    let player = commands
+        .spawn(character_bundle(positions, characters, asset_server))
+        .insert(tutorial::FirstPlayer)
+        .id();
+
+    commands.trigger_targets(FirstPlayerAdded, player)
+}
+
+fn character_bundle(
+    positions: Query<&Position>,
+    mut characters: ResMut<Characters>,
+    asset_server: Res<AssetServer>,
+) -> impl Bundle {
     let avoid_positions: Vec<&Position> = positions.iter().collect();
     let (start_pos, target_pos) = rand_journey_target(avoid_positions);
 
     let color = Color::Srgba(COLORS[characters.color_index % COLORS.len()]);
     characters.color_index += 1;
 
-    commands.spawn((
+    (
         Player,
         character_sprite(&asset_server, color, start_pos),
         start_pos,
@@ -39,7 +54,7 @@ pub fn spawn_player(
             color,
             scale: rand::thread_rng().gen_range(0.6..0.9),
         },
-    ));
+    )
 }
 
 pub fn character_sprite(
@@ -123,5 +138,5 @@ pub fn add_new_character_on_finished_journey(
         .color
         .set_alpha(0.3);
 
-    spawn_player(commands, asset_server, characters, positions);
+    commands.spawn(character_bundle(positions, characters, asset_server));
 }

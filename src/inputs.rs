@@ -39,7 +39,7 @@ pub(crate) fn handle_input_movement(
     }
 }
 
-fn journey_finished(journey: &Journey, current_pos: &Position) -> bool {
+pub fn journey_finished(journey: &Journey, current_pos: &Position) -> bool {
     let has_reached_target = journey.path.contains(&journey.target_pos);
     let back_to_start = *current_pos == journey.start_pos;
     has_reached_target && back_to_start

@@ -14,6 +14,7 @@ mod destroyed;
 mod draws;
 mod inputs;
 mod movements;
+mod tutorial;
 
 const WINDOW_SIZE: f32 = 600.;
 
@@ -48,7 +49,7 @@ fn main() {
 }
 
 pub fn game_plugin(app: &mut App) {
-    app.add_systems(Startup, (setup_camera, characters::spawn_player))
+    app.add_systems(Startup, (setup_camera, characters::spawn_first_player))
         .add_systems(
             Update,
             (
@@ -58,6 +59,7 @@ pub fn game_plugin(app: &mut App) {
                     movements::move_transit_entities,
                     movements::detect_collisions,
                     destroyed::destroyed_animation,
+                    tutorial::validate_first_tutorial,
                 ),
                 // drawing
                 movements::position_to_transform,
@@ -67,7 +69,8 @@ pub fn game_plugin(app: &mut App) {
                 .chain(),
         )
         .init_resource::<characters::Characters>()
-        .observe(characters::add_new_character_on_finished_journey);
+        .observe(characters::add_new_character_on_finished_journey)
+        .observe(tutorial::spawn_first_tutorial);
 }
 
 pub fn setup_camera(mut commands: Commands) {

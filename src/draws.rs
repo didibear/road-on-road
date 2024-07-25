@@ -19,9 +19,10 @@ pub fn draw_grid(mut gizmos: Gizmos) {
 
 pub fn draw_targets(mut gizmos: Gizmos, journeys: Query<&Journey, With<Player>>) {
     for journey in journeys.iter() {
-        gizmos.circle_2d(
+        gizmos.rounded_rect_2d(
             position_translation(&journey.start_pos) + CELL_SIZE / 2.,
-            CELL_SIZE / 2. * 1.1,
+            0.,
+            Vec2::splat(CELL_SIZE),
             journey.color,
         );
         gizmos.circle_2d(
