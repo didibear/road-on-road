@@ -1,7 +1,9 @@
 use crate::characters;
 use crate::components::*;
+use crate::scores::Score;
 use crate::sounds::play_random_sound;
 use crate::AllAssets;
+use crate::WINDOW_SIZE;
 use bevy::prelude::*;
 
 use crate::CELL_SIZE;
@@ -62,6 +64,7 @@ pub fn detect_collisions(
     journeys: Query<&Journey>,
     assets: Res<AllAssets>,
     mut sprites: Query<&mut Sprite>,
+    mut score: ResMut<Score>,
 ) {
     let mut destroyed_entities: Vec<Entity> = Vec::new();
 
@@ -102,6 +105,14 @@ pub fn detect_collisions(
 
             if was_player {
                 commands.spawn(play_random_sound(&assets.hurt_sound));
+
+                score.remaining_attempts -= 1;
+                if score.remaining_attempts == 0 {
+                    commands.spawn(lose_text());
+                    commands.entity(destroyed_entity).insert(GameFinishedPlayer);
+                    return;
+                }
+
                 sprites
                     .get_mut(destroyed_entity)
                     .expect("Bot sprite")
@@ -134,5 +145,23 @@ pub fn detect_collisions(
                 ));
             }
         }
+    }
+}
+
+fn lose_text() -> Text2dBundle {
+    let text_position = Vec3::new(0., WINDOW_SIZE / 2. - CELL_SIZE - 32., 0.);
+
+    Text2dBundle {
+        text: Text::from_section(
+            "Game ended",
+            TextStyle {
+                font_size: 48.0,
+                ..default()
+            },
+        )
+        .with_justify(JustifyText::Center),
+        transform: Transform::from_translation(text_position),
+
+        ..default()
     }
 }

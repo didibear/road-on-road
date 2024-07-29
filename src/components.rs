@@ -24,6 +24,9 @@ impl Transition {
 pub struct Player;
 
 #[derive(Debug, Component)]
+pub struct GameFinishedPlayer;
+
+#[derive(Debug, Component)]
 pub struct Automated;
 
 pub type WithPlayerOrAutomated = Or<(With<Automated>, With<Player>)>;

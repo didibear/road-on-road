@@ -17,7 +17,10 @@ pub fn draw_grid(mut gizmos: Gizmos) {
         .outer_edges();
 }
 
-pub fn draw_targets(mut gizmos: Gizmos, journeys: Query<&Journey, With<Player>>) {
+pub fn draw_targets(
+    mut gizmos: Gizmos,
+    journeys: Query<&Journey, Or<(With<Player>, With<GameFinishedPlayer>)>>,
+) {
     for journey in journeys.iter() {
         gizmos.rounded_rect_2d(
             position_translation(&journey.start_pos) + CELL_SIZE / 2.,

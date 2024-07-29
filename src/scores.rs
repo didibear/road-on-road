@@ -1,32 +1,34 @@
 use crate::{components::*, CELL_SIZE, WINDOW_SIZE};
 use bevy::prelude::*;
 
-#[derive(Debug, Resource, Default)]
+#[derive(Debug, Resource)]
 pub struct Score {
-    nb_journeys: u32,
-    max_nb_characters: u32,
+    pub nb_journeys: u32,
+    pub remaining_attempts: u32,
+}
+
+pub const NB_ATTEMPTS: u32 = 20;
+
+impl Default for Score {
+    fn default() -> Self {
+        Self {
+            nb_journeys: 0,
+            remaining_attempts: NB_ATTEMPTS,
+        }
+    }
 }
 
 impl Score {
     fn text(&self) -> String {
         format!(
-            "Total Journeys: {}, Max Ducks: {}",
-            self.nb_journeys, self.max_nb_characters
+            "Remaining Attempts: {}, Journeys: {}",
+            self.remaining_attempts, self.nb_journeys
         )
     }
 }
 
 #[derive(Debug, Component)]
 pub struct ScoreDisplay;
-
-pub fn update_max_nb_characters(
-    characters: Query<Entity, WithPlayerOrAutomated>,
-    mut score: ResMut<Score>,
-) {
-    score.max_nb_characters = score
-        .max_nb_characters
-        .max(characters.iter().count() as u32);
-}
 
 pub fn score_nb_journeys(_trigger: Trigger<JourneyFinished>, mut score: ResMut<Score>) {
     score.nb_journeys += 1

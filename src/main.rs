@@ -74,7 +74,6 @@ pub fn game_plugin(app: &mut App) {
                 movements::detect_collisions,
                 destroyed::destroyed_animation,
                 tutorial::validate_first_tutorial,
-                scores::update_max_nb_characters,
                 scores::update_score_display,
             ),
             // drawing

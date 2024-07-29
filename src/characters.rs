@@ -1,5 +1,7 @@
 use crate::components::*;
 use crate::movements;
+use crate::scores::Score;
+use crate::scores::NB_ATTEMPTS;
 use crate::tutorial;
 use crate::tutorial::FirstPlayerAdded;
 use crate::AllAssets;
@@ -132,6 +134,7 @@ pub fn add_new_character_on_finished_journey(
     characters: ResMut<Characters>,
     positions: Query<&Position>,
     mut journeys: Query<&mut Journey>,
+    mut score: ResMut<Score>,
 ) {
     // Current character becomes a bot
     commands
@@ -156,4 +159,5 @@ pub fn add_new_character_on_finished_journey(
         characters,
         assets,
     ));
+    score.remaining_attempts = NB_ATTEMPTS;
 }
