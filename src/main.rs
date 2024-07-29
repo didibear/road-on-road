@@ -5,10 +5,9 @@
 #![allow(clippy::too_many_arguments, clippy::type_complexity)]
 
 use bevy::asset::AssetMetaCheck;
-use bevy::audio::{AudioPlugin, Volume};
+use bevy::audio::AudioPlugin;
 use bevy::prelude::*;
 use bevy::window::WindowResolution;
-use bevy_asset_loader::prelude::*;
 
 mod characters;
 mod components;
