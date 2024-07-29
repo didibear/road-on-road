@@ -23,9 +23,15 @@ pub fn spawn_first_player(
     assets: Res<AllAssets>,
     characters: ResMut<Characters>,
     positions: Query<&Position>,
+    journeys: Query<&Journey>,
 ) {
     let player = commands
-        .spawn(character_bundle(positions, characters, assets))
+        .spawn(character_bundle(
+            positions,
+            journeys.iter().collect(),
+            characters,
+            assets,
+        ))
         .insert(tutorial::FirstPlayer)
         .id();
 
@@ -33,11 +39,14 @@ pub fn spawn_first_player(
 }
 
 fn character_bundle(
-    positions: Query<&Position>,
+    character_positions: Query<&Position>,
+    journeys: Vec<&Journey>,
     mut characters: ResMut<Characters>,
     assets: Res<AllAssets>,
 ) -> impl Bundle {
-    let avoid_positions: Vec<&Position> = positions.iter().collect();
+    let spawn_positions = journeys.iter().map(|journey| &journey.start_pos);
+    let avoid_positions: Vec<&Position> =
+        character_positions.iter().chain(spawn_positions).collect();
     let (start_pos, target_pos) = rand_journey_target(avoid_positions);
 
     let color = Color::Srgba(COLORS[characters.color_index % COLORS.len()]);
@@ -122,6 +131,7 @@ pub fn add_new_character_on_finished_journey(
     mut sprites: Query<&mut Sprite>,
     characters: ResMut<Characters>,
     positions: Query<&Position>,
+    mut journeys: Query<&mut Journey>,
 ) {
     // Current character becomes a bot
     commands
@@ -135,5 +145,15 @@ pub fn add_new_character_on_finished_journey(
         .color
         .set_alpha(0.3);
 
-    commands.spawn(character_bundle(positions, characters, assets));
+    journeys
+        .get_mut(trigger.entity())
+        .expect("Bot journey")
+        .bot_index = 0;
+
+    commands.spawn(character_bundle(
+        positions,
+        journeys.iter().collect(),
+        characters,
+        assets,
+    ));
 }
