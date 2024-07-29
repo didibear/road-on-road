@@ -63,31 +63,34 @@ pub fn detect_collisions(
     assets: Res<AllAssets>,
     mut sprites: Query<&mut Sprite>,
 ) {
+    let mut destroyed_entities: Vec<Entity> = Vec::new();
+
     for [(entity_a, transform_a, journey_a), (entity_b, transform_b, journey_b)] in
         locations.iter_combinations()
     {
         if transform_a.translation.distance(transform_b.translation) <= CELL_SIZE / 2. {
             let destroyed_entity = {
-                // if players.get(entity_a).is_ok() {
-                //     entity_a
-                // } else {
-                //     entity_b
-                // }
                 let is_a_on_spawn = journey_a.path.len() <= 1 || journey_a.bot_index == 0;
                 let is_b_on_spawn = journey_b.path.len() <= 1 || journey_b.bot_index == 0;
 
-                if is_a_on_spawn && is_b_on_spawn {
+                if players.get(entity_a).is_ok() {
+                    entity_a
+                } else if is_a_on_spawn && is_b_on_spawn {
                     continue;
                 } else if is_a_on_spawn {
                     entity_b
                 } else if is_b_on_spawn {
                     entity_a
-                } else if players.get(entity_a).is_ok() {
-                    entity_a
                 } else {
                     entity_b
                 }
             };
+
+            if destroyed_entities.contains(&destroyed_entity) {
+                continue;
+            } else {
+                destroyed_entities.push(destroyed_entity);
+            }
 
             commands
                 .entity(destroyed_entity)
