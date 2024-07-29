@@ -57,23 +57,32 @@ pub fn move_transit_entities(
 
 pub fn detect_collisions(
     mut commands: Commands,
-    locations: Query<(Entity, &Transform, &Journey), WithPlayerOrAutomated>,
+    locations: Query<(Entity, &Transform, &Journey), (WithPlayerOrAutomated, With<Transition>)>,
     players: Query<Entity, With<Player>>,
     journeys: Query<&Journey>,
     assets: Res<AllAssets>,
     mut sprites: Query<&mut Sprite>,
 ) {
-    for [(entity_a, transform_a, journey_a), (entity_b, transform_b, _)] in
+    for [(entity_a, transform_a, journey_a), (entity_b, transform_b, journey_b)] in
         locations.iter_combinations()
     {
         if transform_a.translation.distance(transform_b.translation) <= CELL_SIZE / 2. {
             let destroyed_entity = {
-                // player die first
-                if players.get(entity_a).is_ok() {
-                    // unless they just spawn
-                    if journey_a.path.len() <= 1 {
-                        continue;
-                    }
+                // if players.get(entity_a).is_ok() {
+                //     entity_a
+                // } else {
+                //     entity_b
+                // }
+                let is_a_on_spawn = journey_a.path.len() <= 1 || journey_a.bot_index == 0;
+                let is_b_on_spawn = journey_b.path.len() <= 1 || journey_b.bot_index == 0;
+
+                if is_a_on_spawn && is_b_on_spawn {
+                    continue;
+                } else if is_a_on_spawn {
+                    entity_b
+                } else if is_b_on_spawn {
+                    entity_a
+                } else if players.get(entity_a).is_ok() {
                     entity_a
                 } else {
                     entity_b
@@ -85,12 +94,11 @@ pub fn detect_collisions(
                 .remove::<(Position, Player, Automated)>()
                 .insert(Destroyed);
 
-            commands.spawn(play_random_sound(&assets.hurt_sound));
-
             let was_player = players.get(destroyed_entity).is_ok();
             let journey = journeys.get(destroyed_entity).expect("Journey on destroy");
 
             if was_player {
+                commands.spawn(play_random_sound(&assets.hurt_sound));
                 sprites
                     .get_mut(destroyed_entity)
                     .expect("Bot sprite")
@@ -103,6 +111,21 @@ pub fn detect_collisions(
                     journey.start_pos,
                     Journey {
                         path: Vec::new(),
+                        ..*journey
+                    },
+                ));
+            } else {
+                commands.spawn((
+                    Automated,
+                    characters::character_sprite(
+                        &assets,
+                        journey.color.with_alpha(0.3),
+                        journey.start_pos,
+                    ),
+                    journey.start_pos,
+                    Journey {
+                        path: journey.path.clone(),
+                        bot_index: 0,
                         ..*journey
                     },
                 ));

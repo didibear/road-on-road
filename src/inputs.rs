@@ -39,11 +39,11 @@ pub fn handle_input_movement(
             }
 
             for (entity, bot_pos, mut bot_journey) in bot_positions.iter_mut() {
-                bot_journey.bot_index = (bot_journey.bot_index + 1) % bot_journey.path.len();
+                bot_journey.bot_index = (bot_journey.bot_index + 1) % bot_journey.path.len() as i32;
 
                 commands.entity(entity).insert(Transition::new(
                     *bot_pos,
-                    bot_journey.path[bot_journey.bot_index],
+                    bot_journey.path[bot_journey.bot_index as usize],
                 ));
             }
         }

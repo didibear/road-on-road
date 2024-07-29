@@ -36,7 +36,7 @@ pub struct Journey {
     pub start_pos: Position,
     pub target_pos: Position,
     pub path: Vec<Position>,
-    pub bot_index: usize,
+    pub bot_index: i32,
     // display
     pub color: Color,
     pub scale: f32,

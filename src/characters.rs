@@ -49,7 +49,7 @@ fn character_bundle(
         start_pos,
         Journey {
             path: Vec::new(),
-            bot_index: 0,
+            bot_index: -1,
             start_pos,
             target_pos,
             color,
