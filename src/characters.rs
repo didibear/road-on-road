@@ -1,4 +1,5 @@
 use crate::components::*;
+use crate::game_state::GameState;
 use crate::movements;
 use crate::scores::Score;
 use crate::scores::NB_ATTEMPTS;
@@ -27,15 +28,10 @@ pub fn spawn_first_player(
     positions: Query<&Position>,
     journeys: Query<&Journey>,
 ) {
-    let player = commands
-        .spawn(character_bundle(
-            positions,
-            journeys.iter().collect(),
-            characters,
-            assets,
-        ))
-        .insert(tutorial::FirstPlayer)
-        .id();
+    let character = character_bundle(positions, journeys.iter().collect(), characters, assets)
+        .expect("First player");
+
+    let player = commands.spawn(character).insert(tutorial::FirstPlayer).id();
 
     commands.trigger_targets(FirstPlayerAdded, player)
 }
@@ -45,16 +41,16 @@ fn character_bundle(
     journeys: Vec<&Journey>,
     mut characters: ResMut<Characters>,
     assets: Res<AllAssets>,
-) -> impl Bundle {
+) -> Option<impl Bundle> {
     let spawn_positions = journeys.iter().map(|journey| &journey.start_pos);
     let avoid_positions: Vec<&Position> =
         character_positions.iter().chain(spawn_positions).collect();
-    let (start_pos, target_pos) = rand_journey_target(avoid_positions);
+    let (start_pos, target_pos) = rand_journey_target(avoid_positions)?;
 
     let color = Color::Srgba(COLORS[characters.color_index % COLORS.len()]);
     characters.color_index += 1;
 
-    (
+    Some((
         GameObject,
         Player,
         character_sprite(&assets, color, start_pos),
@@ -68,7 +64,7 @@ fn character_bundle(
             color,
             scale: rand::thread_rng().gen_range(0.6..0.9),
         },
-    )
+    ))
 }
 
 pub fn character_sprite(assets: &AllAssets, color: Color, start_pos: Position) -> SpriteBundle {
@@ -109,8 +105,21 @@ impl Side {
     }
 }
 
-fn rand_journey_target(avoid_positions: Vec<&Position>) -> (Position, Position) {
+fn rand_position_fallback() -> Position {
     let mut rng = rand::thread_rng();
+    Position(IVec2::new(
+        rng.gen_range(0..GRID_SIZE.x) as i32,
+        rng.gen_range(0..GRID_SIZE.y) as i32,
+    ))
+}
+
+fn rand_journey_target(avoid_positions: Vec<&Position>) -> Option<(Position, Position)> {
+    let mut rng = rand::thread_rng();
+
+    const FALLBACK_ATTEMPTS: i32 = 1_000;
+    const MAX_ATTEMPTS: i32 = 1_000_000;
+
+    let mut attempts = 0;
 
     loop {
         let sides: Vec<Side> = [Side::Top, Side::Down, Side::Left, Side::Right]
@@ -118,13 +127,22 @@ fn rand_journey_target(avoid_positions: Vec<&Position>) -> (Position, Position) 
             .cloned()
             .collect();
 
-        let start_pos = sides[0].rand_position();
+        let start_pos = if attempts >= FALLBACK_ATTEMPTS {
+            rand_position_fallback()
+        } else {
+            sides[0].rand_position()
+        };
+
         let target_pos = sides[1].rand_position();
 
-        if avoid_positions.contains(&&start_pos) {
+        if avoid_positions.contains(&&start_pos) || start_pos == target_pos {
+            attempts += 1;
+            if attempts >= MAX_ATTEMPTS {
+                return None;
+            }
             continue;
         }
-        return (start_pos, target_pos);
+        return Some((start_pos, target_pos));
     }
 }
 
@@ -137,6 +155,7 @@ pub fn add_new_character_on_finished_journey(
     positions: Query<&Position>,
     mut journeys: Query<&mut Journey>,
     mut score: ResMut<Score>,
+    mut next_state: ResMut<NextState<GameState>>,
 ) {
     // Current character becomes a bot
     commands
@@ -155,11 +174,12 @@ pub fn add_new_character_on_finished_journey(
         .expect("Bot journey")
         .bot_index = 0;
 
-    commands.spawn(character_bundle(
-        positions,
-        journeys.iter().collect(),
-        characters,
-        assets,
-    ));
+    let Some(character) =
+        character_bundle(positions, journeys.iter().collect(), characters, assets)
+    else {
+        next_state.set(GameState::EndGame);
+        return;
+    };
+    commands.spawn(character);
     score.remaining_attempts = NB_ATTEMPTS;
 }
