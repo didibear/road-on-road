@@ -59,6 +59,7 @@ fn character_bundle(
         Player,
         character_sprite(&assets, color, start_pos),
         start_pos,
+        JustSpawned,
         Journey {
             path: Vec::new(),
             bot_index: -1,

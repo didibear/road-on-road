@@ -27,6 +27,9 @@ impl Transition {
 pub struct Player;
 
 #[derive(Debug, Component)]
+pub struct JustSpawned;
+
+#[derive(Debug, Component)]
 pub struct GameFinishedPlayer;
 
 #[derive(Debug, Component)]

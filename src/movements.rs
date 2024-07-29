@@ -4,7 +4,6 @@ use crate::game_state::GameState;
 use crate::scores::Score;
 use crate::sounds::play_random_sound;
 use crate::AllAssets;
-use crate::WINDOW_SIZE;
 use bevy::prelude::*;
 
 use crate::CELL_SIZE;
@@ -42,9 +41,9 @@ const SPEED: f32 = CELL_SIZE / 6.;
 pub fn move_transit_entities(
     mut commands: Commands,
     mut transitions: Query<(Entity, &mut Transition, &mut Position)>,
+    just_spawned: Query<Entity, With<JustSpawned>>,
     time: Res<Time>,
 ) {
-    // current_pos.0 = next_pos;
     for (entity, mut transition, mut pos) in transitions.iter_mut() {
         let direction =
             (transition.end.0.as_vec2() - transition.start.0.as_vec2()).normalize_or_zero();
@@ -54,13 +53,17 @@ pub fn move_transit_entities(
         if transition.start.0.as_vec2().distance(transition.current) >= 1. {
             commands.entity(entity).remove::<Transition>();
             *pos = transition.end;
+
+            if let Ok(ent) = just_spawned.get(entity) {
+                commands.entity(ent).remove::<JustSpawned>();
+            }
         }
     }
 }
 
 pub fn detect_collisions(
     mut commands: Commands,
-    locations: Query<(Entity, &Transform, &Journey), (WithPlayerOrAutomated, With<Transition>)>,
+    locations: Query<(Entity, &Transform), (WithPlayerOrAutomated, Without<JustSpawned>)>,
     players: Query<Entity, With<Player>>,
     journeys: Query<&Journey>,
     assets: Res<AllAssets>,
@@ -70,21 +73,10 @@ pub fn detect_collisions(
 ) {
     let mut destroyed_entities: Vec<Entity> = Vec::new();
 
-    for [(entity_a, transform_a, journey_a), (entity_b, transform_b, journey_b)] in
-        locations.iter_combinations()
-    {
+    for [(entity_a, transform_a), (entity_b, transform_b)] in locations.iter_combinations() {
         if transform_a.translation.distance(transform_b.translation) <= CELL_SIZE / 2. {
             let destroyed_entity = {
-                let is_a_on_spawn = journey_a.path.len() <= 1 || journey_a.bot_index == 0;
-                let is_b_on_spawn = journey_b.path.len() <= 1 || journey_b.bot_index == 0;
-
                 if players.get(entity_a).is_ok() {
-                    entity_a
-                } else if is_a_on_spawn && is_b_on_spawn {
-                    continue;
-                } else if is_a_on_spawn {
-                    entity_b
-                } else if is_b_on_spawn {
                     entity_a
                 } else {
                     entity_b
@@ -126,6 +118,7 @@ pub fn detect_collisions(
                     Player,
                     characters::character_sprite(&assets, journey.color, journey.start_pos),
                     journey.start_pos,
+                    JustSpawned,
                     Journey {
                         path: Vec::new(),
                         ..*journey
@@ -141,6 +134,7 @@ pub fn detect_collisions(
                         journey.start_pos,
                     ),
                     journey.start_pos,
+                    JustSpawned,
                     Journey {
                         path: journey.path.clone(),
                         bot_index: 0,
