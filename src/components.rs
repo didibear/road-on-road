@@ -1,5 +1,8 @@
 use bevy::prelude::*;
 
+#[derive(Debug, Component)]
+pub struct GameObject;
+
 #[derive(Debug, Component, Clone, Copy, PartialEq, Eq)]
 pub struct Position(pub IVec2);
 

@@ -24,6 +24,7 @@ pub fn spawn_first_tutorial(
     let text_position = sprite_position_translation(journey.target_pos.0.as_vec2());
 
     commands.spawn((
+        GameObject,
         Tutorial,
         Text2dBundle {
             text: Text::from_section("Go here", text_style()).with_justify(JustifyText::Center),

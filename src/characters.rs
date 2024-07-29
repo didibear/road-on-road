@@ -55,6 +55,7 @@ fn character_bundle(
     characters.color_index += 1;
 
     (
+        GameObject,
         Player,
         character_sprite(&assets, color, start_pos),
         start_pos,

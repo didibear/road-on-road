@@ -1,5 +1,6 @@
 use crate::characters;
 use crate::components::*;
+use crate::game_state::GameState;
 use crate::scores::Score;
 use crate::sounds::play_random_sound;
 use crate::AllAssets;
@@ -65,6 +66,7 @@ pub fn detect_collisions(
     assets: Res<AllAssets>,
     mut sprites: Query<&mut Sprite>,
     mut score: ResMut<Score>,
+    mut next_state: ResMut<NextState<GameState>>,
 ) {
     let mut destroyed_entities: Vec<Entity> = Vec::new();
 
@@ -108,8 +110,8 @@ pub fn detect_collisions(
 
                 score.remaining_attempts -= 1;
                 if score.remaining_attempts == 0 {
-                    commands.spawn(lose_text());
                     commands.entity(destroyed_entity).insert(GameFinishedPlayer);
+                    next_state.set(GameState::EndGame);
                     return;
                 }
 
@@ -120,6 +122,7 @@ pub fn detect_collisions(
                     .set_alpha(0.3);
 
                 commands.spawn((
+                    GameObject,
                     Player,
                     characters::character_sprite(&assets, journey.color, journey.start_pos),
                     journey.start_pos,
@@ -130,6 +133,7 @@ pub fn detect_collisions(
                 ));
             } else {
                 commands.spawn((
+                    GameObject,
                     Automated,
                     characters::character_sprite(
                         &assets,
@@ -145,23 +149,5 @@ pub fn detect_collisions(
                 ));
             }
         }
-    }
-}
-
-fn lose_text() -> Text2dBundle {
-    let text_position = Vec3::new(0., WINDOW_SIZE / 2. - CELL_SIZE - 32., 0.);
-
-    Text2dBundle {
-        text: Text::from_section(
-            "Game ended",
-            TextStyle {
-                font_size: 48.0,
-                ..default()
-            },
-        )
-        .with_justify(JustifyText::Center),
-        transform: Transform::from_translation(text_position),
-
-        ..default()
     }
 }

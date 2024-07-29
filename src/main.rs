@@ -13,6 +13,7 @@ mod characters;
 mod components;
 mod destroyed;
 mod draws;
+mod game_state;
 mod inputs;
 mod movements;
 mod scores;
@@ -56,39 +57,48 @@ fn main() {
 }
 
 pub fn game_plugin(app: &mut App) {
-    app.add_systems(
-        Startup,
-        (
-            setup_camera,
+    app.init_state::<game_state::GameState>()
+        .enable_state_scoped_entities::<game_state::GameState>()
+        .add_systems(Startup, (setup_camera, scores::spawn_score_display))
+        .add_systems(
+            OnEnter(game_state::GameState::InGame),
             characters::spawn_first_player,
-            scores::spawn_score_display,
-        ),
-    )
-    .add_systems(
-        Update,
-        (
-            // logic
-            (
-                inputs::handle_input_movement,
-                movements::move_transit_entities,
-                movements::detect_collisions,
-                destroyed::destroyed_animation,
-                tutorial::validate_first_tutorial,
-                scores::update_score_display,
-            ),
-            // drawing
-            movements::position_to_transform,
-            (draws::draw_grid, draws::draw_paths),
-            draws::draw_targets,
         )
-            .chain(),
-    )
-    .init_resource::<characters::Characters>()
-    .init_resource::<scores::Score>()
-    .init_resource::<AllAssets>()
-    .observe(characters::add_new_character_on_finished_journey)
-    .observe(tutorial::spawn_first_tutorial)
-    .observe(scores::score_nb_journeys);
+        .add_systems(
+            OnEnter(game_state::GameState::EndGame),
+            game_state::spawn_restart_text,
+        )
+        .add_systems(
+            Update,
+            (
+                // logic
+                (
+                    inputs::handle_input_movement.run_if(in_state(game_state::GameState::InGame)),
+                    game_state::handle_restart_input
+                        .run_if(in_state(game_state::GameState::EndGame)),
+                    movements::move_transit_entities,
+                    movements::detect_collisions,
+                    destroyed::destroyed_animation,
+                    tutorial::validate_first_tutorial,
+                    scores::update_score_display,
+                ),
+                // drawing
+                movements::position_to_transform,
+                (draws::draw_grid, draws::draw_paths),
+                draws::draw_targets,
+            )
+                .chain(),
+        )
+        .add_systems(
+            OnExit(game_state::GameState::EndGame),
+            game_state::clear_up_game_entities,
+        )
+        .init_resource::<characters::Characters>()
+        .init_resource::<scores::Score>()
+        .init_resource::<AllAssets>()
+        .observe(characters::add_new_character_on_finished_journey)
+        .observe(tutorial::spawn_first_tutorial)
+        .observe(scores::score_nb_journeys);
 }
 
 pub fn setup_camera(mut commands: Commands) {
