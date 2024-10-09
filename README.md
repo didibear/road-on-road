@@ -1,7 +1,21 @@
-# Bevy Jam #5 - Cycles
+# Road on Road
 
-Project setup using [bevy_github_ci_template](https://github.com/bevyengine/bevy_github_ci_template).
+![image](https://github.com/user-attachments/assets/681cab8c-9a4a-4654-9745-314caaf04cc6)
 
+Little game for the [Bevy Jam #5 - Cycles](https://itch.io/jam/bevy-jam-5).
+
+## Game
+
+https://didibear.itch.io/road-on-road
+
+Make as many journeys as possible, avoiding previous versions of yourself!
+
+Commands: Arrow keys or WASD
+
+## Development
+
+Project setup using [bevy_github_ci_template](https://github.com/bevyengine/bevy_github_ci_template).  
+Sounds generated using [Chiptone](https://sfbgames.itch.io/chiptone)
 
 ## Build
 
